@@ -1,0 +1,7 @@
+Scenario,Value
+Top-1 Accuracy,0.9778056274256145
+Top-2 Accuracy,0.9978978007761966
+Top-3 Accuracy,0.999332956015524
+Clean Data Accuracy,0.9778056274256145
+Noisy Data Accuracy,0.7002951164294955
+Missing Codon Accuracy,0.41609395213454076

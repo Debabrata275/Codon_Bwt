@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- <title>Hybrid Codon Recommendation System</title> -->
+  <title>Codon Usage Tool</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #000;
+      color: #fff;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* Network Background */
+    #network-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Header */
+    .header {
+      padding: 20px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 10;
+      flex-wrap: wrap;
+    }
+
+    .logo {
+      font-size: 36px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      color: transparent;
+    }
+
+    .nav-icons {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .nav-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 2px solid #d4af37;
+      background: rgba(212, 175, 55, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 22px;
+    }
+
+    .nav-icon:hover {
+      background: rgba(212, 175, 55, 0.3);
+      transform: scale(1.1);
+    }
+
+    .nav-icon.active {
+      background: rgba(212, 175, 55, 0.5);
+      box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+    }
+
+    /* Main Content */
+    .container {
+      position: relative;
+      z-index: 10;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px 15px 50px;
+    }
+
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+      animation: fadeIn 0.5s;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .page-title {
+      font-size: 22px;
+      margin-bottom: 10px;
+      color: #d4af37;
+      text-align: center;
+    }
+
+    .page-subtitle {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 25px;
+      text-align: center;
+    }
+
+    /* Form Elements */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #fff;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 12px 15px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      border-radius: 25px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.3s;
+    }
+
+    input::placeholder {
+      color: #888;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: #d4af37;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      background: rgba(212, 175, 55, 0.2);
+      border: 2px solid #d4af37;
+      border-radius: 25px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 15px;
+    }
+
+    button:hover {
+      background: rgba(212, 175, 55, 0.4);
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    /* Results Section */
+    .result-section {
+      margin-top: 30px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 15px;
+      border: 1px solid rgba(212, 175, 55, 0.2);
+    }
+
+    .result-section h3 {
+      font-size: 18px;
+      color: #d4af37;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      background: rgba(255, 255, 255, 0.05);
+      font-size: 13px;
+      overflow-x: auto;
+      display: block;
+    }
+
+    thead, tbody {
+      display: table;
+      width: 100%;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      padding: 10px 8px;
+      text-align: center;
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      word-wrap: break-word;
+    }
+
+    th {
+      background: rgba(212, 175, 55, 0.2);
+      color: #fff;
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    td {
+      color: #ccc;
+      font-size: 12px;
+    }
+
+    .highlight {
+      background: rgba(212, 175, 55, 0.3);
+      color: #fff;
+      font-weight: bold;
+    }
+
+    /* Species List */
+    .species-highlight {
+      color: #d4af37;
+      font-size: 18px;
+      text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+      margin-bottom: 15px;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    ul li {
+      padding: 12px;
+      margin: 10px 0;
+      background: rgba(255, 255, 255, 0.05);
+      border-left: 3px solid #d4af37;
+      border-radius: 5px;
+      font-size: 13px;
+      word-wrap: break-word;
+    }
+
+    ul li.top-species {
+      background: linear-gradient(90deg, rgba(212, 175, 55, 0.3), rgba(212, 175, 55, 0.1));
+      border-left: 4px solid #d4af37;
+      font-weight: bold;
+      color: #d4af37;
+      box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+    }
+
+    /* Image Grid */
+    .img-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .img-grid img {
+      width: 100%;
+      height: auto;
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      object-fit: cover;
+    }
+
+    .img-grid img:hover {
+      border-color: #d4af37;
+      transform: scale(1.05);
+    }
+
+    .img-grid img.expanded {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1000;
+      width: auto;
+      height: auto;
+      max-width: 90vw;
+      max-height: 85vh;
+      border: 4px solid #d4af37;
+      border-radius: 15px;
+      box-shadow: 0 0 60px rgba(212, 175, 55, 0.8);
+      background: #ffffff;
+      padding: 10px;
+      object-fit: contain;
+    }
+
+    .image-title {
+      position: fixed;
+      top: 5%;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1001;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 12px 25px;
+      border-radius: 25px;
+      border: 2px solid #d4af37;
+      color: #d4af37;
+      font-size: 16px;
+      font-weight: bold;
+      display: none;
+      text-align: center;
+      max-width: 90%;
+      word-wrap: break-word;
+    }
+
+    .image-title.active {
+      display: block;
+      animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    .overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 999;
+    }
+
+    .overlay.active {
+      display: block;
+    }
+
+    /* Metrics Note */
+    .metric-note {
+      background: rgba(212, 175, 55, 0.1);
+      border-left: 4px solid #d4af37;
+      padding: 12px;
+      margin-top: 15px;
+      border-radius: 5px;
+      font-size: 12px;
+      color: #ccc;
+      line-height: 1.5;
+    }
+
+    /* Tablet Responsive */
+    @media (min-width: 481px) and (max-width: 768px) {
+      .header {
+        padding: 20px 25px;
+      }
+
+      .logo {
+        font-size: 32px;
+      }
+
+      .nav-icon {
+        width: 45px;
+        height: 45px;
+        font-size: 20px;
+      }
+
+      .container {
+        padding: 20px 20px 40px;
+      }
+
+      .page-title {
+        font-size: 20px;
+      }
+
+      .img-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+
+      table {
+        font-size: 12px;
+      }
+
+      th, td {
+        padding: 8px 6px;
+      }
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 480px) {
+      .header {
+        padding: 15px 15px;
+        justify-content: center;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .logo {
+        font-size: 28px;
+        order: 2;
+      }
+
+      .nav-icons {
+        order: 1;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      .nav-icon {
+        width: 45px;
+        height: 45px;
+        font-size: 20px;
+      }
+
+      .container {
+        padding: 15px 12px 40px;
+      }
+
+      .page-title {
+        font-size: 18px;
+      }
+
+      .page-subtitle {
+        font-size: 12px;
+      }
+
+      .form-group {
+        margin-bottom: 18px;
+      }
+
+      label {
+        font-size: 13px;
+      }
+
+      input, select {
+        padding: 11px 13px;
+        font-size: 13px;
+      }
+
+      button {
+        padding: 12px;
+        font-size: 14px;
+      }
+
+      .result-section {
+        padding: 15px;
+        margin-top: 25px;
+      }
+
+      .result-section h3 {
+        font-size: 16px;
+      }
+
+      .species-highlight {
+        font-size: 16px;
+      }
+
+      table {
+        font-size: 11px;
+      }
+
+      th, td {
+        padding: 8px 5px;
+        font-size: 11px;
+      }
+
+      ul li {
+        padding: 10px;
+        font-size: 12px;
+      }
+
+      .img-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .img-grid img.expanded {
+        max-width: 95vw;
+        max-height: 80vh;
+        padding: 8px;
+      }
+
+      .image-title {
+        font-size: 14px;
+        padding: 10px 20px;
+        top: 3%;
+      }
+
+      .metric-note {
+        font-size: 11px;
+        padding: 10px;
+      }
+    }
+
+    /* Landscape Mobile */
+    @media (max-width: 768px) and (orientation: landscape) {
+      .header {
+        padding: 10px 20px;
+      }
+
+      .container {
+        padding: 15px 15px 30px;
+      }
+
+      .img-grid img.expanded {
+        max-height: 90vh;
+      }
+
+      .image-title {
+        top: 2%;
+        font-size: 13px;
+        padding: 8px 18px;
+      }
+    }
+
+    /* Desktop Large */
+    @media (min-width: 1200px) {
+      .container {
+        max-width: 1000px;
+      }
+
+      .img-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+      }
+
+      .page-title {
+        font-size: 26px;
+      }
+
+      table {
+        font-size: 14px;
+      }
+
+      th, td {
+        padding: 12px 10px;
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Network Background -->
+  <canvas id="network-bg"></canvas>
+
+  <!-- Image Overlay -->
+  <div class="overlay" id="overlay"></div>
+  
+  <!-- Image Title -->
+  <div class="image-title" id="imageTitle"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">.</div>
+    <div class="nav-icons">
+      <div class="nav-icon active" onclick="showPage('home')" title="Home">🏠</div>
+      <div class="nav-icon" onclick="showPage('metrics')" title="Metrics">📊</div>
+      <div class="nav-icon" onclick="showPage('proof')" title="Training Proof">📈</div>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="container">
+
+    <!-- Page 1: Home - Hybrid Codon Recommendation System -->
+    <div id="home" class="page active">
+      <!-- <div class="page-title">Hybrid Codon Recommendation System</div> -->
+      <div class="page-title">Codon Usage Tool</div>
+      <div class="page-subtitle">[Default Optimize Page]</div>
+
+      <div class="form-group">
+        <label>Amino Acid (Single Letter):</label>
+        <input id="aa" placeholder="Example: L, K, F">
+      </div>
+
+      <div class="form-group">
+        <label>Codon (RNA format, optional):</label>
+        <input id="codon" placeholder="Example: UUA, UUU">
+      </div>
+
+      <button onclick="analyze()">Analyze</button>
+
+      <div id="home-results" style="display: none;">
+
+        <div class="result-section">
+          <h3>Codon Ranking</h3>
+          <table id="rankingTable">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Codon</th>
+                <th>Frequency</th>
+                <th>ML Weight</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="result-section">
+          <h3 class="species-highlight">Top Species (Usage Based)</h3>
+          <ul id="species"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page 2: Metrics -->
+    <div id="metrics" class="page">
+      <div class="page-title">Model Performance Metrics</div>
+      <div class="page-subtitle">Accuracy Comparison & Evaluation</div>
+
+      <div class="result-section">
+        <h3>Accuracy Comparison</h3>
+        <table id="accuracyCompare">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Accuracy</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Codon Only</td>
+              <td id="accCodon">–</td>
+            </tr>
+            <tr>
+              <td>Codon + BWT</td>
+              <td id="accBWT">–</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="result-section">
+        <h3>Model Evaluation Metrics</h3>
+        <table id="metricsTable">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Top-1 Accuracy</td>
+              <td>–</td>
+            </tr>
+            <tr>
+              <td>Top-2 Accuracy</td>
+              <td>–</td>
+            </tr>
+            <tr>
+              <td>Top-3 Accuracy</td>
+              <td>–</td>
+            </tr>
+            <tr>
+              <td>Precision</td>
+              <td>–</td>
+            </tr>
+            <tr>
+              <td>Recall</td>
+              <td>–</td>
+            </tr>
+            <tr>
+              <td>F1 Score</td>
+              <td>–</td>
+            </tr>
+            <tr>
+              <td>Loss</td>
+              <td>–</td>
+            </tr>
+            <tr>
+              <td>Error</td>
+              <td>–</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="metric-note">
+          <strong>Note:</strong>
+          Top-1 accuracy reflects primary classification performance, while
+          Top-2 and Top-3 accuracies measure prediction robustness.
+          Error rate is computed as one minus Top-1 accuracy.
+        </div>
+      </div>
+
+      <div class="result-section">
+        <h3>Robustness Evaluation</h3>
+        <table id="robustnessTable">
+          <thead>
+            <tr>
+              <th>Data Condition</th>
+              <th>Accuracy</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Clean</td>
+              <td id="accClean">–</td>
+            </tr>
+            <tr>
+              <td>Noisy</td>
+              <td id="accNoisy">–</td>
+            </tr>
+            <tr>
+              <td>Missing</td>
+              <td id="accMissing">–</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Page 3: Training Proof -->
+    <div id="proof" class="page">
+      <div class="page-title">Training & Evaluation Proof</div>
+      <div class="page-subtitle">Model Training Visualizations</div>
+
+      <div class="result-section">
+        <div class="img-grid">
+          <img src="/static/Codon_BWT.png" alt="Codon BWT" onclick="expandImage(this)">
+          <img src="/static/BWT impact output.png" alt="BWT Impact" onclick="expandImage(this)">
+          <img src="/static/confusion matrix output.png" alt="Confusion Matrix" onclick="expandImage(this)">
+          <img src="/static/Feature Correlation Heatmap output.png" alt="Feature Correlation" onclick="expandImage(this)">
+          <img src="/static/Residual Dist output.png" alt="Residual Distribution" onclick="expandImage(this)">
+          <img src="/static/Residuals vs Predictions output.png" alt="Residuals vs Predictions" onclick="expandImage(this)">
+          <img src="/static/Test data metric output.png" alt="Test Data Metrics" onclick="expandImage(this)">
+          <img src="/static/Training vs test Acc output.png" alt="Training vs Test Accuracy" onclick="expandImage(this)">
+          <img src="/static/Training vs test loss output.png" alt="Training vs Test Loss" onclick="expandImage(this)">
+          <img src="/static/Recall_F1 Score.png" alt="Recall F1 Score" onclick="expandImage(this)">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Network Background Animation
+    const canvas = document.getElementById('network-bg');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const particles = [];
+    const particleCount = window.innerWidth < 768 ? 40 : 80;
+
+    class Particle {
+      constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.vx = (Math.random() - 0.5) * 0.5;
+        this.vy = (Math.random() - 0.5) * 0.5;
+        this.radius = Math.random() * 2 + 1;
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+
+        if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+        if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(212, 175, 55, 0.5)';
+        ctx.fill();
+      }
+    }
+
+    for (let i = 0; i < particleCount; i++) {
+      particles.push(new Particle());
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+
+      // Draw connections
+      particles.forEach((p1, i) => {
+        particles.slice(i + 1).forEach(p2 => {
+          const dx = p1.x - p2.x;
+          const dy = p1.y - p2.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 150) {
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = `rgba(212, 175, 55, ${0.2 * (1 - dist / 150)})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        });
+      });
+
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+
+    // Navigation
+    function showPage(pageId) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-icon').forEach(n => n.classList.remove('active'));
+      
+      document.getElementById(pageId).classList.add('active');
+      event.target.closest('.nav-icon').classList.add('active');
+    }
+
+    // Image Expansion
+    let expandedImage = null;
+    const overlay = document.getElementById('overlay');
+    const imageTitle = document.getElementById('imageTitle');
+
+    function expandImage(img) {
+      // Collapse previously expanded image if any
+      if (expandedImage && expandedImage !== img) {
+        expandedImage.classList.remove('expanded');
+      }
+
+      // Toggle current image
+      if (img.classList.contains('expanded')) {
+        img.classList.remove('expanded');
+        overlay.classList.remove('active');
+        imageTitle.classList.remove('active');
+        expandedImage = null;
+      } else {
+        img.classList.add('expanded');
+        overlay.classList.add('active');
+        imageTitle.textContent = img.alt;
+        imageTitle.classList.add('active');
+        expandedImage = img;
+      }
+    }
+
+    // Click overlay to close
+    overlay.addEventListener('click', () => {
+      if (expandedImage) {
+        expandedImage.classList.remove('expanded');
+        overlay.classList.remove('active');
+        imageTitle.classList.remove('active');
+        expandedImage = null;
+      }
+    });
+
+    // Analyze Function
+    async function analyze() {
+      const aa = document.getElementById("aa").value.trim().toUpperCase();
+      const codon = document.getElementById("codon").value.trim().toUpperCase();
+
+      const res = await fetch("/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amino_acid: aa, codon: codon })
+      });
+
+      const data = await res.json();
+      if (data.error) return alert(data.error);
+
+      // Show results
+      document.getElementById('home-results').style.display = 'block';
+
+      // Codon ranking
+      let rHTML = '';
+      data.codon_ranking.forEach(r => {
+        rHTML += `<tr class="${r.codon === codon ? 'highlight' : ''}">
+          <td>${r.rank}</td><td>${r.codon}</td>
+          <td>${r.frequency.toFixed(4)}</td>
+          <td>${r.ml_weight.toFixed(2)}</td></tr>`;
+      });
+      document.querySelector("#rankingTable tbody").innerHTML = rHTML;
+
+      // Top species
+      document.getElementById("species").innerHTML =
+        data.top_species.map((s, index) =>
+          `<li class="${index === 0 ? 'top-species' : ''}">${s.SPECIESNAME} — ${s.SCORE.toFixed(4)}</li>`
+        ).join("");
+
+      // Accuracy comparison
+      document.getElementById("accCodon").innerText =
+        (data.model_metrics.accuracy_codon_only * 100).toFixed(2) + "%";
+      document.getElementById("accBWT").innerText =
+        (data.model_metrics.accuracy_codon_bwt * 100).toFixed(2) + "%";
+
+      // Metrics table
+      const m = data.model_metrics;
+      const rows = document.querySelectorAll("#metricsTable tbody tr td:nth-child(2)");
+      rows[0].innerText = m.top1_accuracy.toFixed(4);
+      rows[1].innerText = m.top2_accuracy.toFixed(4);
+      rows[2].innerText = m.top3_accuracy.toFixed(4);
+      rows[3].innerText = m.precision.toFixed(4);
+      rows[4].innerText = m.recall.toFixed(4);
+      rows[5].innerText = m.f1_score.toFixed(4);
+      rows[6].innerText = m.loss.toFixed(4);
+      rows[7].innerText = (1 - m.top1_accuracy).toFixed(4);
+
+      // Robustness
+      document.getElementById("accClean").innerText =
+        (m.accuracy_clean * 100).toFixed(2) + "%";
+      document.getElementById("accNoisy").innerText =
+        (m.accuracy_noisy * 100).toFixed(2) + "%";
+      document.getElementById("accMissing").innerText =
+        (m.accuracy_missing * 100).toFixed(2) + "%";
+    }
+  </script>
+
+</body>
+
+</html>
