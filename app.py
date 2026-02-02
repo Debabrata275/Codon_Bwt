@@ -13,17 +13,13 @@ CORS(app)
 
 # ================= LOAD CODON USAGE DATA =================
 
-try:
-    codon_df = pd.read_csv("codon_usage.csv", low_memory=False)
-    codon_df.columns = [c.strip().upper() for c in codon_df.columns]
+codon_df = pd.read_csv("codon_usage.csv", low_memory=False)
+codon_df.columns = [c.strip().upper() for c in codon_df.columns]
 
-    # Convert all non-metadata columns to numeric safely
-    for col in codon_df.columns:
-        if col not in ["SPECIESNAME", "KINGDOM"]:
-            codon_df[col] = pd.to_numeric(codon_df[col], errors="coerce")
-
-except Exception as e:
-    raise RuntimeError(f"Failed to load codon_usage.csv: {e}")
+# Force numeric conversion (CRITICAL for production)
+for col in codon_df.columns:
+    if col not in ["SPECIESNAME", "KINGDOM"]:
+        codon_df[col] = pd.to_numeric(codon_df[col], errors="coerce")
 
 # ================= LOAD ML MODEL (SAFE) =================
 
@@ -36,13 +32,29 @@ try:
 except Exception as e:
     print("⚠ ML model not loaded:", e)
 
-# ================= LOAD EVALUATION METRICS =================
+# ================= LOAD EVALUATION METRICS (SAFE DEFAULTS) =================
+
+DEFAULT_METRICS = {
+    "top1_accuracy": 0.0,
+    "top2_accuracy": 0.0,
+    "top3_accuracy": 0.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1_score": 0.0,
+    "loss": 0.0,
+    "accuracy_clean": 0.0,
+    "accuracy_noisy": 0.0,
+    "accuracy_missing": 0.0,
+    "accuracy_codon_only": 0.0,
+    "accuracy_codon_bwt": 0.0
+}
 
 try:
     with open("model_outputs/evaluation_metrics.json", "r") as f:
-        EVAL_METRICS = json.load(f)
+        raw = json.load(f)
+        EVAL_METRICS = {k: float(raw.get(k, 0.0)) for k in DEFAULT_METRICS}
 except Exception:
-    EVAL_METRICS = {}
+    EVAL_METRICS = DEFAULT_METRICS.copy()
 
 # ================= GENETIC CODE =================
 
@@ -50,12 +62,13 @@ VALID_AA = set("ACDEFGHIKLMNPQRSTVWY")
 
 table = CodonTable.unambiguous_rna_by_id[1]
 AA_TO_CODONS = {}
+
 for codon, aa in table.forward_table.items():
     AA_TO_CODONS.setdefault(aa, []).append(codon)
 
 # ================= CORE ANALYSIS =================
 
-def analyze_core(aa, selected_codon=None):
+def analyze(aa, selected_codon=None):
     aa = aa.upper()
     selected_codon = selected_codon.upper() if selected_codon else None
 
@@ -83,7 +96,10 @@ def analyze_core(aa, selected_codon=None):
         })
 
     df_tmp = codon_df.copy()
-    df_tmp["SCORE"] = df_tmp[selected_codon] if selected_codon in codons else df_tmp[codons].sum(axis=1)
+    if selected_codon and selected_codon in codons:
+        df_tmp["SCORE"] = df_tmp[selected_codon]
+    else:
+        df_tmp["SCORE"] = df_tmp[codons].sum(axis=1)
 
     top_species = (
         df_tmp.sort_values("SCORE", ascending=False)
@@ -101,28 +117,41 @@ def analyze_core(aa, selected_codon=None):
 
 def species_specific_analysis(aa, codon=None):
     try:
+        aa = aa.upper()
+        codon = codon.upper() if codon else None
+
         codons = [c for c in AA_TO_CODONS.get(aa, []) if c in codon_df.columns]
         if not codons:
             return None
 
         df = codon_df.copy()
-        df["PREFERENCE_SCORE"] = df[codon] if codon in codons else df[codons].sum(axis=1)
+
+        if codon and codon in codons:
+            df["PREFERENCE_SCORE"] = df[codon]
+            used_codons = [codon]
+        else:
+            df["PREFERENCE_SCORE"] = df[codons].sum(axis=1)
+            used_codons = codons
 
         max_val = df["PREFERENCE_SCORE"].max()
         if max_val and max_val > 0:
             df["PREFERENCE_SCORE"] /= max_val
 
         return {
+            "used_codons": used_codons,
             "top_species": df.sort_values("PREFERENCE_SCORE", ascending=False)
                 .head(5)[["SPECIESNAME", "PREFERENCE_SCORE"]]
                 .to_dict(orient="records"),
             "bottom_species": df.sort_values("PREFERENCE_SCORE")
                 .head(5)[["SPECIESNAME", "PREFERENCE_SCORE"]]
                 .to_dict(orient="records"),
-            "explanation": f"Species-specific preference variation for amino acid {aa}."
+            "explanation": (
+                f"Species-specific codon preference highlights how organisms "
+                f"differ in using codon(s) {', '.join(used_codons)} for amino acid {aa}."
+            )
         }
     except Exception as e:
-        print("Species analysis failed:", e)
+        print("Species preference failed:", e)
         return None
 
 # ================= HOST-AWARE OPTIMIZATION =================
@@ -132,10 +161,16 @@ def host_aware_optimization(aa, host_species):
         if not host_species:
             return None
 
+        aa = aa.upper()
         codons = [c for c in AA_TO_CODONS.get(aa, []) if c in codon_df.columns]
-        df = codon_df[codon_df["SPECIESNAME"].str.contains(host_species, case=False, na=False)]
+        if not codons:
+            return None
 
-        if df.empty or not codons:
+        df = codon_df[
+            codon_df["SPECIESNAME"].str.contains(host_species, case=False, na=False)
+        ]
+
+        if df.empty:
             return None
 
         mean_usage = df[codons].mean(skipna=True).sort_values(ascending=False)
@@ -143,7 +178,7 @@ def host_aware_optimization(aa, host_species):
         return {
             "host_species": host_species,
             "optimal_codon": mean_usage.index[0],
-            "codon_ranking": list(mean_usage.items())
+            "codon_ranking": [(c, float(v)) for c, v in mean_usage.items()]
         }
     except Exception as e:
         print("Host optimization failed:", e)
@@ -176,14 +211,17 @@ def codon_bias_score(codon):
             )
         }
     except Exception as e:
-        print("Bias score failed:", e)
+        print("Codon bias failed:", e)
         return None
 
 # ================= CROSS-KINGDOM COMPARISON =================
 
 def cross_kingdom_comparison(codon):
     try:
-        if "KINGDOM" not in codon_df.columns or codon not in codon_df.columns:
+        if not codon or codon not in codon_df.columns:
+            return []
+
+        if "KINGDOM" not in codon_df.columns:
             return []
 
         grouped = (
@@ -192,9 +230,10 @@ def cross_kingdom_comparison(codon):
             .reset_index()
             .dropna()
         )
+
         return grouped.to_dict(orient="records")
     except Exception as e:
-        print("Kingdom comparison failed:", e)
+        print("Cross-kingdom failed:", e)
         return []
 
 # ================= ROUTES =================
@@ -209,18 +248,22 @@ def analyze_api():
 
     aa = data.get("amino_acid", "")
     codon = data.get("codon", "")
-    host_species = data.get("host_species", "")
+    host_species = data.get("host_species", "").strip()
 
-    result, error = analyze_core(aa, codon)
+    result, error = analyze(aa, codon)
     if error:
         return jsonify({"error": error}), 400
 
     return jsonify({
-        **result,
+        "codon_ranking": result["codon_ranking"],
+        "selected_rank": result["selected_rank"],
+        "top_species": result["top_species"],
+
         "species_specific_analysis": species_specific_analysis(aa, codon),
         "host_aware_optimization": host_aware_optimization(aa, host_species),
         "codon_bias_score": codon_bias_score(codon),
         "cross_kingdom_comparison": cross_kingdom_comparison(codon),
+
         "model_metrics": EVAL_METRICS
     })
 
