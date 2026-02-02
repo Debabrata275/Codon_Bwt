@@ -5,15 +5,17 @@ import joblib
 import json
 from Bio.Data import CodonTable
 
+# ================= APP SETUP =================
+
 app = Flask(__name__, template_folder=".")
 CORS(app)
 
-# ================= LOAD CODON USAGE =================
+# ================= LOAD CODON USAGE DATA =================
 
 codon_df = pd.read_csv("codon_usage.csv", low_memory=False)
 codon_df.columns = [c.strip().upper() for c in codon_df.columns]
 
-# ================= LOAD TRAINED MODEL =================
+# ================= LOAD ML MODEL =================
 
 model = joblib.load("model_outputs/global_codon_bwt_model.pkl")
 booster = model.get_booster()
@@ -24,11 +26,9 @@ feature_importance = booster.get_score(importance_type="weight")
 with open("model_outputs/evaluation_metrics.json", "r") as f:
     EVAL_METRICS = json.load(f)
 
-# ================= VALID AMINO ACIDS =================
+# ================= GENETIC CODE =================
 
 VALID_AA = set("ACDEFGHIKLMNPQRSTVWY")
-
-# ================= GENETIC CODE (RNA) =================
 
 table = CodonTable.unambiguous_rna_by_id[1]
 AA_TO_CODONS = {}
@@ -84,6 +84,109 @@ def analyze(aa, selected_codon=None):
         "top_species": top_species
     }, None
 
+# ================= SPECIES-SPECIFIC PREFERENCE =================
+
+def species_specific_analysis(aa, codon=None):
+    aa = aa.upper()
+    codon = codon.upper() if codon else None
+
+    codons = [c for c in AA_TO_CODONS.get(aa, []) if c in codon_df.columns]
+    if not codons:
+        return None
+
+    df = codon_df.copy()
+
+    if codon and codon in codons:
+        df["PREFERENCE_SCORE"] = df[codon]
+        used_codons = [codon]
+    else:
+        df["PREFERENCE_SCORE"] = df[codons].sum(axis=1)
+        used_codons = codons
+
+    max_val = df["PREFERENCE_SCORE"].max()
+    if max_val > 0:
+        df["PREFERENCE_SCORE"] /= max_val
+
+    return {
+        "used_codons": used_codons,
+        "top_species": df.sort_values("PREFERENCE_SCORE", ascending=False)
+            .head(5)[["SPECIESNAME", "PREFERENCE_SCORE"]]
+            .to_dict(orient="records"),
+        "bottom_species": df.sort_values("PREFERENCE_SCORE")
+            .head(5)[["SPECIESNAME", "PREFERENCE_SCORE"]]
+            .to_dict(orient="records"),
+        "explanation": (
+            f"Species-specific codon preference highlights how organisms "
+            f"differ in using codon(s) {', '.join(used_codons)} for amino acid {aa}."
+        )
+    }
+
+# ================= HOST-AWARE OPTIMIZATION =================
+
+def host_aware_optimization(aa, host_species):
+    if not host_species:
+        return None
+
+    aa = aa.upper()
+    codons = [c for c in AA_TO_CODONS.get(aa, []) if c in codon_df.columns]
+    if not codons:
+        return None
+
+    df = codon_df[
+        codon_df["SPECIESNAME"].str.contains(host_species, case=False, na=False)
+    ]
+
+    if df.empty:
+        return None
+
+    mean_usage = df[codons].mean().sort_values(ascending=False)
+
+    return {
+        "host_species": host_species,
+        "optimal_codon": mean_usage.index[0],
+        "codon_ranking": list(mean_usage.items())
+    }
+
+# ================= CODON BIAS SCORE =================
+
+def codon_bias_score(codon):
+    if not codon or codon not in codon_df.columns:
+        return None
+
+    global_avg = codon_df[codon].mean()
+    if global_avg == 0:
+        return None
+
+    df = codon_df.copy()
+    df["bias"] = df[codon] / global_avg
+
+    return {
+        "codon": codon,
+        "global_average": float(global_avg),
+        "top_bias_species": (
+            df.sort_values("bias", ascending=False)
+            .head(5)[["SPECIESNAME", "bias"]]
+            .to_dict(orient="records")
+        )
+    }
+
+# ================= CROSS-KINGDOM COMPARISON =================
+
+def cross_kingdom_comparison(codon):
+    if not codon or codon not in codon_df.columns:
+        return []
+
+    if "KINGDOM" not in codon_df.columns:
+        return []
+
+    grouped = (
+        codon_df.groupby("KINGDOM")[codon]
+        .mean()
+        .reset_index()
+    )
+
+    return grouped.to_dict(orient="records")
+
 # ================= ROUTES =================
 
 @app.route("/")
@@ -93,54 +196,42 @@ def home():
 @app.route("/analyze", methods=["POST"])
 def analyze_api():
     data = request.json
+
     aa = data.get("amino_acid", "")
     codon = data.get("codon", "")
+    host_species = data.get("host_species", "").strip()
 
     result, error = analyze(aa, codon)
     if error:
         return jsonify({"error": error}), 400
-
-    # ---------- Accuracy values ----------
-    top1_acc = EVAL_METRICS.get("accuracy_top1")
-    top2_acc = EVAL_METRICS.get("accuracy_top2")
-    top3_acc = EVAL_METRICS.get("accuracy_top3")
 
     return jsonify({
         "codon_ranking": result["codon_ranking"],
         "selected_rank": result["selected_rank"],
         "top_species": result["top_species"],
 
-        # ===== MODEL EVALUATION METRICS =====
-        "model_metrics": {
-            "top1_accuracy": top1_acc,
-            "top2_accuracy": top2_acc,
-            "top3_accuracy": top3_acc,
+        "species_specific_analysis": species_specific_analysis(aa, codon),
+        "host_aware_optimization": host_aware_optimization(aa, host_species),
+        "codon_bias_score": codon_bias_score(codon),
+        "cross_kingdom_comparison": cross_kingdom_comparison(codon),
 
+        "model_metrics": {
+            "top1_accuracy": EVAL_METRICS.get("accuracy_top1"),
+            "top2_accuracy": EVAL_METRICS.get("accuracy_top2"),
+            "top3_accuracy": EVAL_METRICS.get("accuracy_top3"),
             "precision": EVAL_METRICS.get("precision"),
             "recall": EVAL_METRICS.get("recall"),
             "f1_score": EVAL_METRICS.get("f1_score"),
             "loss": EVAL_METRICS.get("loss"),
-
-            # robustness
             "accuracy_clean": EVAL_METRICS.get("accuracy_clean"),
             "accuracy_noisy": EVAL_METRICS.get("accuracy_noisy"),
             "accuracy_missing": EVAL_METRICS.get("accuracy_missing"),
-
-            # comparison
             "accuracy_codon_only": EVAL_METRICS.get("accuracy_codon_only"),
             "accuracy_codon_bwt": EVAL_METRICS.get("accuracy_codon_bwt"),
-
-            # derived
-            "error": (1 - top1_acc) if top1_acc is not None else None
-        },
-
-        # ===== SINGLE SOURCE OF TRUTH EXPLANATION =====
-        "accuracy_explanation": (
-            "The hybrid Codon + BWT model improves Top-1 accuracy from 96.91% to 97.78%, "
-            "and demonstrates robustness under noisy and missing data. "
-            "Training plots and confusion matrices are included as evidence of model convergence."
-        )
+        }
     })
+
+# ================= RUN =================
 
 if __name__ == "__main__":
     app.run(debug=True)
