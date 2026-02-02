@@ -34,27 +34,51 @@ except Exception as e:
 
 # ================= LOAD EVALUATION METRICS (SAFE DEFAULTS) =================
 
-DEFAULT_METRICS = {
-    "top1_accuracy": 0.0,
-    "top2_accuracy": 0.0,
-    "top3_accuracy": 0.0,
-    "precision": 0.0,
-    "recall": 0.0,
-    "f1_score": 0.0,
-    "loss": 0.0,
-    "accuracy_clean": 0.0,
-    "accuracy_noisy": 0.0,
-    "accuracy_missing": 0.0,
-    "accuracy_codon_only": 0.0,
-    "accuracy_codon_bwt": 0.0
-}
-
 try:
     with open("model_outputs/evaluation_metrics.json", "r") as f:
         raw = json.load(f)
-        EVAL_METRICS = {k: float(raw.get(k, 0.0)) for k in DEFAULT_METRICS}
-except Exception:
-    EVAL_METRICS = DEFAULT_METRICS.copy()
+
+    EVAL_METRICS = {
+        # Top-k accuracies (FIXED)
+        "top1_accuracy": float(raw.get("accuracy_top1", 0.0)),
+        "top2_accuracy": float(raw.get("accuracy_top2", 0.0)),
+        "top3_accuracy": float(raw.get("accuracy_top3", 0.0)),
+
+        # Standard metrics
+        "precision": float(raw.get("precision", 0.0)),
+        "recall": float(raw.get("recall", 0.0)),
+        "f1_score": float(raw.get("f1_score", 0.0)),
+        "loss": float(raw.get("loss", 0.0)),
+        "roc_auc": float(raw.get("roc_auc", 0.0)),
+
+        # Robustness metrics
+        "accuracy_clean": float(raw.get("accuracy_clean", 0.0)),
+        "accuracy_noisy": float(raw.get("accuracy_noisy", 0.0)),
+        "accuracy_missing": float(raw.get("accuracy_missing", 0.0)),
+
+        # Model comparison
+        "accuracy_codon_only": float(raw.get("accuracy_codon_only", 0.0)),
+        "accuracy_codon_bwt": float(raw.get("accuracy_codon_bwt", 0.0))
+    }
+
+except Exception as e:
+    print("⚠ Failed to load evaluation metrics:", e)
+    EVAL_METRICS = {
+        "top1_accuracy": 0.0,
+        "top2_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "loss": 0.0,
+        "roc_auc": 0.0,
+        "accuracy_clean": 0.0,
+        "accuracy_noisy": 0.0,
+        "accuracy_missing": 0.0,
+        "accuracy_codon_only": 0.0,
+        "accuracy_codon_bwt": 0.0
+    }
+
 
 # ================= GENETIC CODE =================
 
@@ -272,3 +296,4 @@ def analyze_api():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
