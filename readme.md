@@ -252,7 +252,17 @@ Final Year Project – Machine Learning & Bioinformatics
 - 🚀 Live Demo: [https://codon-usage-tool.onrender.com/](https://codon-usage-tool.onrender.com/)
 
 ---
+## 👥 Other Contributors
 
+### 🧑‍💻 Debabrata Debnath  
+[![GitHub](https://img.shields.io/badge/GitHub-Debabrata275-181717?style=flat&logo=github)](https://github.com/Debabrata275)  
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Debabrata%20Debnath-0A66C2?style=flat&logo=linkedin)](https://www.linkedin.com/in/debabrata-debnath-b28820235)
+
+### 🧑‍💻 Srija Chandra  
+[![GitHub](https://img.shields.io/badge/GitHub-SrijaChandra-181717?style=flat&logo=github)](https://github.com/SrijaChandra)  
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Srija%20Chandra-0A66C2?style=flat&logo=linkedin)](https://www.linkedin.com/in/srija-chandra-85813a272/)
+
+---
 ## 📜 License
 
 This project is intended for **academic and research use**.
@@ -272,3 +282,4 @@ For questions, suggestions, or collaborations, please reach out through GitHub o
 ---
 
 **⭐ If you find this project useful, please consider giving it a star on GitHub!**
+
